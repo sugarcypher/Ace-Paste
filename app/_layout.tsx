@@ -5,6 +5,7 @@ import React, { useEffect } from "react";
 import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SecurityProvider } from "@/contexts/SecurityContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { trpc, trpcClient } from "@/lib/trpc";
 
 SplashScreen.preventAutoHideAsync();
@@ -33,6 +34,13 @@ function RootLayoutNav() {
           headerShown: false 
         }} 
       />
+      <Stack.Screen 
+        name="subscription" 
+        options={{ 
+          headerShown: false,
+          presentation: "modal"
+        }} 
+      />
     </Stack>
   );
 }
@@ -46,9 +54,11 @@ export default function RootLayout() {
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
         <SecurityProvider>
-          <GestureHandlerRootView style={styles.container}>
-            <RootLayoutNav />
-          </GestureHandlerRootView>
+          <SubscriptionProvider>
+            <GestureHandlerRootView style={styles.container}>
+              <RootLayoutNav />
+            </GestureHandlerRootView>
+          </SubscriptionProvider>
         </SecurityProvider>
       </QueryClientProvider>
     </trpc.Provider>

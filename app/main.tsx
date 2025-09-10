@@ -28,19 +28,44 @@ import { router } from 'expo-router';
 import { detectInvisibleCharacters, stripInvisibleCharacters } from '@/utils/invisibleCharacters';
 import type { DetectionResult } from '@/types/detection';
 import { useSecurity } from '@/contexts/SecurityContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 export default function MainScreen() {
   const { securitySettings } = useSecurity();
+  const { 
+    subscription, 
+    currentPlan, 
+    hasActiveSubscription, 
+    getRemainingUsage, 
+    incrementUsage 
+  } = useSubscription();
   const [inputText, setInputText] = useState('');
   const [cleanedText, setCleanedText] = useState('');
   const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
 
-  const processText = useCallback((text: string) => {
+  const processText = useCallback(async (text: string) => {
     if (!text) {
       setCleanedText('');
       setDetectionResult(null);
+      return;
+    }
+
+    // Check usage limits
+    const canProcess = await incrementUsage();
+    if (!canProcess) {
+      Alert.alert(
+        'Usage Limit Reached',
+        'You have reached your daily processing limit. Upgrade to continue using ACE Paste.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Upgrade', 
+            onPress: () => router.push('/subscription')
+          }
+        ]
+      );
       return;
     }
 
@@ -64,7 +89,7 @@ export default function MainScreen() {
         }),
       ]).start();
     }
-  }, [fadeAnim]);
+  }, [fadeAnim, incrementUsage]);
 
   const handleInputChange = useCallback((text: string) => {
     setInputText(text);
@@ -116,6 +141,10 @@ export default function MainScreen() {
     router.push('/privacy-agreement');
   }, []);
 
+  const handleUpgrade = useCallback(() => {
+    router.push('/subscription');
+  }, []);
+
   const stats = useMemo(() => {
     if (!detectionResult) return null;
     
@@ -159,6 +188,31 @@ export default function MainScreen() {
               <Text style={styles.subtitle}>
                 Remove invisible tracking characters from your text
               </Text>
+              
+              {/* Subscription Status */}
+              <View style={styles.subscriptionStatus}>
+                <View style={styles.subscriptionInfo}>
+                  <Text style={styles.planName}>
+                    {currentPlan?.name || 'Free Plan'}
+                  </Text>
+                  {subscription?.status === 'trial' && (
+                    <Text style={styles.trialText}>
+                      Trial: {subscription.trialEnd ? Math.max(0, Math.ceil((subscription.trialEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 0} days left
+                    </Text>
+                  )}
+                  <Text style={styles.usageText}>
+                    {getRemainingUsage() === -1 ? 'Unlimited' : `${getRemainingUsage()} uses left today`}
+                  </Text>
+                </View>
+                {!hasActiveSubscription && (
+                  <TouchableOpacity 
+                    style={styles.upgradeButton}
+                    onPress={handleUpgrade}
+                  >
+                    <Text style={styles.upgradeButtonText}>Upgrade</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               
               {/* Security Status */}
               <View style={styles.securityStatus}>
@@ -345,6 +399,46 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     marginBottom: 16,
+  },
+  subscriptionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(96, 165, 250, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.3)',
+  },
+  subscriptionInfo: {
+    flex: 1,
+  },
+  planName: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#60A5FA',
+    marginBottom: 2,
+  },
+  trialText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    marginBottom: 2,
+  },
+  usageText: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  upgradeButton: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  upgradeButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
   },
   securityStatus: {
     flexDirection: 'row',
