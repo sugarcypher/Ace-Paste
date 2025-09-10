@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.ace-paste"
+      "bundleIdentifier": "app.rork.ace-paste"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.ace-paste",
+      "package": "app.rork.ace-paste",
       "permissions": [
         "android.permission.VIBRATE"
       ]
