@@ -145,7 +145,7 @@ export default function MainScreen() {
             <View style={styles.header}>
               <View style={styles.titleContainer}>
                 <Image 
-                  source={{ uri: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/qnz0c0lks242k1if54ftq' }}
+                  source={{ uri: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/qmt9oso62gen3dc5p09i7' }}
                   style={styles.logoImage}
                   resizeMode="contain"
                 />
