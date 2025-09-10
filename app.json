@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Invisible Character Remover",
-    "slug": "invisible-character-remover",
+    "name": "Ace Paste",
+    "slug": "ace-paste",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.rork.invisible-character-remover"
+      "bundleIdentifier": "app.ace-paste"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.invisible-character-remover",
+      "package": "app.ace-paste",
       "permissions": [
         "android.permission.VIBRATE"
       ]
