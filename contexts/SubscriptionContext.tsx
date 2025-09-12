@@ -304,7 +304,7 @@ export const [SubscriptionProvider, useSubscription] = createContextHook(() => {
     } finally {
       setIsLoading(false);
     }
-  }, [subscriptionQuery]);
+  }, []);
 
   useEffect(() => {
     loadSubscriptionData();
@@ -320,7 +320,7 @@ export const [SubscriptionProvider, useSubscription] = createContextHook(() => {
     } catch (error) {
       console.error('Failed to refresh subscription:', error);
     }
-  }, [subscriptionQuery]);
+  }, []);
 
   const subscribe = useCallback(async (planId: string) => {
     try {
