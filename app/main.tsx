@@ -23,12 +23,15 @@ import {
   CheckCircle,
   FileText,
   Settings,
+  Camera,
+  Sliders,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { detectInvisibleCharacters, stripInvisibleCharacters } from '@/utils/invisibleCharacters';
-import type { DetectionResult } from '@/types/detection';
+import { detectAllIssues, cleanText } from '@/utils/invisibleCharacters';
+import type { DetectionResult, CleaningOptions, ScanResult } from '@/types/detection';
 import { useSecurity } from '@/contexts/SecurityContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import ScanModal from '@/components/ScanModal';
 
 export default function MainScreen() {
   const { securitySettings } = useSecurity();
@@ -43,6 +46,16 @@ export default function MainScreen() {
   const [cleanedText, setCleanedText] = useState('');
   const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  const [cleaningOptions, setCleaningOptions] = useState<CleaningOptions>({
+    invisibleChars: true,
+    markdownHeaders: false,
+    markdownBold: false,
+    repeatingChars: false,
+    formattingLines: false,
+    extraWhitespace: false,
+  });
   const fadeAnim = useState(new Animated.Value(0))[0];
 
   const processText = useCallback(async (text: string) => {
@@ -69,13 +82,16 @@ export default function MainScreen() {
       return;
     }
 
-    const result = detectInvisibleCharacters(text);
-    const cleaned = stripInvisibleCharacters(text);
+    const result = detectAllIssues(text, cleaningOptions);
+    const cleaned = cleanText(text, cleaningOptions);
     
     setDetectionResult(result);
     setCleanedText(cleaned);
 
-    if (result.totalCount > 0) {
+    const totalIssues = result.totalCount + 
+      (result.additionalCleaning ? Object.values(result.additionalCleaning).reduce((a, b) => a + b, 0) : 0);
+
+    if (totalIssues > 0) {
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -89,7 +105,7 @@ export default function MainScreen() {
         }),
       ]).start();
     }
-  }, [fadeAnim, incrementUsage]);
+  }, [fadeAnim, incrementUsage, cleaningOptions]);
 
   const handleInputChange = useCallback((text: string) => {
     setInputText(text);
@@ -145,12 +161,56 @@ export default function MainScreen() {
     router.push('/subscription');
   }, []);
 
+  const handleScan = useCallback(() => {
+    setShowScanModal(true);
+  }, []);
+
+  const handleScanComplete = useCallback((result: ScanResult) => {
+    if (result.text) {
+      handleInputChange(result.text);
+    }
+  }, [handleInputChange]);
+
+  const toggleOption = useCallback((option: keyof CleaningOptions) => {
+    setCleaningOptions(prev => {
+      const newOptions = {
+        ...prev,
+        [option]: !prev[option],
+      };
+      
+      // Re-process text with new options if we have input
+      if (inputText) {
+        setTimeout(() => {
+          const result = detectAllIssues(inputText, newOptions);
+          const cleaned = cleanText(inputText, newOptions);
+          setDetectionResult(result);
+          setCleanedText(cleaned);
+        }, 0);
+      }
+      
+      return newOptions;
+    });
+  }, [inputText]);
+
+  const toggleOptionsPanel = useCallback(() => {
+    setShowOptions(prev => !prev);
+  }, []);
+
   const stats = useMemo(() => {
     if (!detectionResult) return null;
     
-    return Object.entries(detectionResult.categories)
+    const invisibleStats = Object.entries(detectionResult.categories)
       .filter(([_, count]) => count > 0)
-      .sort(([_, a], [__, b]) => b - a);
+      .map(([category, count]) => ({ category, count, type: 'invisible' as const }));
+    
+    const additionalStats = detectionResult.additionalCleaning 
+      ? Object.entries(detectionResult.additionalCleaning)
+          .filter(([_, count]) => count > 0)
+          .map(([category, count]) => ({ category, count, type: 'additional' as const }))
+      : [];
+    
+    return [...invisibleStats, ...additionalStats]
+      .sort((a, b) => b.count - a.count);
   }, [detectionResult]);
 
   const characterDifference = inputText.length - cleanedText.length;
@@ -237,12 +297,26 @@ export default function MainScreen() {
               <View style={styles.sectionHeader}>
                 <FileText color="#60A5FA" size={20} />
                 <Text style={styles.sectionTitle}>Original Text</Text>
-                <TouchableOpacity 
-                  onPress={handlePaste}
-                  style={styles.pasteButton}
-                >
-                  <Text style={styles.pasteButtonText}>Paste</Text>
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                  <TouchableOpacity 
+                    onPress={handleScan}
+                    style={styles.actionButton}
+                  >
+                    <Camera color="#60A5FA" size={18} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={toggleOptionsPanel}
+                    style={[styles.actionButton, showOptions && styles.actionButtonActive]}
+                  >
+                    <Sliders color="#60A5FA" size={18} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={handlePaste}
+                    style={styles.pasteButton}
+                  >
+                    <Text style={styles.pasteButtonText}>Paste</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={styles.inputContainer}>
                 <TextInput
@@ -262,8 +336,78 @@ export default function MainScreen() {
               </View>
             </View>
 
+            {/* Cleaning Options */}
+            {showOptions && (
+              <View style={styles.optionsPanel}>
+                <Text style={styles.optionsPanelTitle}>Cleaning Options</Text>
+                <View style={styles.optionsGrid}>
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('invisibleChars')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.invisibleChars && styles.checkboxActive]}>
+                      {cleaningOptions.invisibleChars && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Invisible Characters</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('markdownHeaders')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.markdownHeaders && styles.checkboxActive]}>
+                      {cleaningOptions.markdownHeaders && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Markdown Headers (##)</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('markdownBold')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.markdownBold && styles.checkboxActive]}>
+                      {cleaningOptions.markdownBold && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Bold Formatting (**)</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('repeatingChars')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.repeatingChars && styles.checkboxActive]}>
+                      {cleaningOptions.repeatingChars && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Repeating Characters (***)</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('formattingLines')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.formattingLines && styles.checkboxActive]}>
+                      {cleaningOptions.formattingLines && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Formatting Lines (---)</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('extraWhitespace')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.extraWhitespace && styles.checkboxActive]}>
+                      {cleaningOptions.extraWhitespace && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Extra Whitespace</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {/* Detection Results */}
-            {detectionResult && detectionResult.totalCount > 0 && (
+            {detectionResult && (detectionResult.totalCount > 0 || 
+              (detectionResult.additionalCleaning && Object.values(detectionResult.additionalCleaning).some(count => count > 0))
+            ) && (
               <Animated.View 
                 style={[
                   styles.detectionCard,
@@ -273,15 +417,15 @@ export default function MainScreen() {
                 <View style={styles.detectionHeader}>
                   <AlertCircle color="#F59E0B" size={20} />
                   <Text style={styles.detectionTitle}>
-                    Found {detectionResult.totalCount} invisible character{detectionResult.totalCount !== 1 ? 's' : ''}
+                    Found {stats?.reduce((total, stat) => total + stat.count, 0) || 0} issue{(stats?.reduce((total, stat) => total + stat.count, 0) || 0) !== 1 ? 's' : ''}
                   </Text>
                 </View>
                 <View style={styles.statsGrid}>
-                  {stats?.map(([category, count]) => (
-                    <View key={category} style={styles.statItem}>
-                      <Text style={styles.statCount}>{count}</Text>
+                  {stats?.map((stat) => (
+                    <View key={stat.category} style={styles.statItem}>
+                      <Text style={styles.statCount}>{stat.count}</Text>
                       <Text style={styles.statLabel}>
-                        {category.replace(/_/g, ' ').toLowerCase()}
+                        {stat.category.replace(/_/g, ' ').toLowerCase()}
                       </Text>
                     </View>
                   ))}
@@ -353,6 +497,12 @@ export default function MainScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        
+        <ScanModal 
+          visible={showScanModal}
+          onClose={() => setShowScanModal(false)}
+          onScanComplete={handleScanComplete}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -617,5 +767,65 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: 'rgba(96, 165, 250, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonActive: {
+    backgroundColor: 'rgba(96, 165, 250, 0.2)',
+    borderColor: '#60A5FA',
+  },
+  optionsPanel: {
+    backgroundColor: '#1A1B3A',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.3)',
+  },
+  optionsPanelTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#E2E8F0',
+    marginBottom: 16,
+  },
+  optionsGrid: {
+    gap: 12,
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#475569',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxActive: {
+    backgroundColor: '#60A5FA',
+    borderColor: '#60A5FA',
+  },
+  optionLabel: {
+    fontSize: 14,
+    color: '#E2E8F0',
+    flex: 1,
   },
 });

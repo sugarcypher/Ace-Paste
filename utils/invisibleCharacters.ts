@@ -1,4 +1,4 @@
-import type { DetectionResult, InvisibleCharacterMap } from '@/types/detection';
+import type { DetectionResult, InvisibleCharacterMap, CleaningOptions } from '@/types/detection';
 
 // Comprehensive list of invisible Unicode characters used for tracking
 export const INVISIBLE_CHARACTERS: InvisibleCharacterMap = {
@@ -188,3 +188,80 @@ export function createInvisibleRegex(): RegExp {
 
 // Export regex for convenience
 export const INVISIBLE_REGEX = createInvisibleRegex();
+
+// Additional cleaning patterns
+const MARKDOWN_HEADER_REGEX = /^#{1,6}\s+/gm;
+const MARKDOWN_BOLD_REGEX = /\*\*(.*?)\*\*|__(.*?)__/g;
+const REPEATING_CHARS_REGEX = /(.)\1{2,}/g;
+const FORMATTING_LINES_REGEX = /^[-=_*]{3,}\s*$/gm;
+const EXTRA_WHITESPACE_REGEX = /\s{2,}/g;
+
+export function detectAllIssues(text: string, options: CleaningOptions): DetectionResult {
+  const invisibleResult = options.invisibleChars ? detectInvisibleCharacters(text) : {
+    totalCount: 0,
+    categories: {
+      ZERO_WIDTH: 0,
+      BIDI_CONTROLS: 0,
+      MATH_OPERATORS: 0,
+      HYPHENATION: 0,
+      VARIATION_SELECTORS: 0,
+      FORMAT_CONTROLS: 0,
+      SHORTHAND: 0,
+      TAG_CHARACTERS: 0,
+      IVS_CHARACTERS: 0,
+    },
+    positions: [],
+  };
+
+  const additionalCleaning = {
+    markdownHeaders: options.markdownHeaders ? (text.match(MARKDOWN_HEADER_REGEX) || []).length : 0,
+    markdownBold: options.markdownBold ? (text.match(MARKDOWN_BOLD_REGEX) || []).length : 0,
+    repeatingChars: options.repeatingChars ? (text.match(REPEATING_CHARS_REGEX) || []).length : 0,
+    formattingLines: options.formattingLines ? (text.match(FORMATTING_LINES_REGEX) || []).length : 0,
+    extraWhitespace: options.extraWhitespace ? (text.match(EXTRA_WHITESPACE_REGEX) || []).length : 0,
+  };
+
+  return {
+    ...invisibleResult,
+    additionalCleaning,
+  };
+}
+
+export function cleanText(text: string, options: CleaningOptions): string {
+  let result = text;
+
+  // Remove invisible characters first
+  if (options.invisibleChars) {
+    result = stripInvisibleCharacters(result);
+  }
+
+  // Remove markdown headers
+  if (options.markdownHeaders) {
+    result = result.replace(MARKDOWN_HEADER_REGEX, '');
+  }
+
+  // Remove markdown bold formatting
+  if (options.markdownBold) {
+    result = result.replace(MARKDOWN_BOLD_REGEX, '$1$2');
+  }
+
+  // Remove repeating characters (3 or more)
+  if (options.repeatingChars) {
+    result = result.replace(REPEATING_CHARS_REGEX, '$1');
+  }
+
+  // Remove formatting lines
+  if (options.formattingLines) {
+    result = result.replace(FORMATTING_LINES_REGEX, '');
+  }
+
+  // Normalize whitespace
+  if (options.extraWhitespace) {
+    result = result.replace(EXTRA_WHITESPACE_REGEX, ' ');
+  }
+
+  // Clean up extra newlines and trim
+  result = result.replace(/\n{3,}/g, '\n\n').trim();
+
+  return result;
+}

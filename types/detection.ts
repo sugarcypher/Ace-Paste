@@ -12,6 +12,13 @@ export interface DetectionResult {
     IVS_CHARACTERS: number;
   };
   positions: number[];
+  additionalCleaning?: {
+    markdownHeaders: number;
+    markdownBold: number;
+    repeatingChars: number;
+    formattingLines: number;
+    extraWhitespace: number;
+  };
 }
 
 export interface InvisibleCharacterMap {
@@ -22,4 +29,19 @@ export interface InvisibleCharacterMap {
   VARIATION_SELECTORS: number[];
   FORMAT_CONTROLS: number[];
   SHORTHAND: number[];
+}
+
+export interface CleaningOptions {
+  invisibleChars: boolean;
+  markdownHeaders: boolean;
+  markdownBold: boolean;
+  repeatingChars: boolean;
+  formattingLines: boolean;
+  extraWhitespace: boolean;
+}
+
+export interface ScanResult {
+  text: string;
+  confidence: number;
+  language?: string;
 }
