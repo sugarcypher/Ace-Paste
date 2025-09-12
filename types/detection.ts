@@ -18,6 +18,7 @@ export interface DetectionResult {
     repeatingChars: number;
     formattingLines: number;
     extraWhitespace: number;
+    wordExchanges: number;
   };
 }
 
@@ -31,6 +32,20 @@ export interface InvisibleCharacterMap {
   SHORTHAND: number[];
 }
 
+export interface WordExchange {
+  id: string;
+  badWord: string;
+  goodWord: string;
+  enabled: boolean;
+}
+
+export interface VarianceSettings {
+  enabled: boolean;
+  synonymVariation: boolean;
+  caseVariation: boolean;
+  pluralVariation: boolean;
+}
+
 export interface CleaningOptions {
   invisibleChars: boolean;
   markdownHeaders: boolean;
@@ -38,6 +53,7 @@ export interface CleaningOptions {
   repeatingChars: boolean;
   formattingLines: boolean;
   extraWhitespace: boolean;
+  wordExchanges: boolean;
 }
 
 export interface ScanResult {

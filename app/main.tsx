@@ -25,10 +25,13 @@ import {
   Settings,
   Camera,
   Sliders,
+  Plus,
+  Minus,
+  RotateCcw,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { detectAllIssues, cleanText } from '@/utils/invisibleCharacters';
-import type { DetectionResult, CleaningOptions, ScanResult } from '@/types/detection';
+import type { DetectionResult, CleaningOptions, ScanResult, WordExchange, VarianceSettings } from '@/types/detection';
 import { useSecurity } from '@/contexts/SecurityContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import ScanModal from '@/components/ScanModal';
@@ -55,6 +58,18 @@ export default function MainScreen() {
     repeatingChars: false,
     formattingLines: false,
     extraWhitespace: false,
+    wordExchanges: false,
+  });
+  const [wordExchanges, setWordExchanges] = useState<WordExchange[]>([
+    { id: '1', badWord: '', goodWord: '', enabled: true },
+    { id: '2', badWord: '', goodWord: '', enabled: true },
+    { id: '3', badWord: '', goodWord: '', enabled: true },
+  ]);
+  const [varianceSettings, setVarianceSettings] = useState<VarianceSettings>({
+    enabled: false,
+    synonymVariation: false,
+    caseVariation: true,
+    pluralVariation: true,
   });
   const fadeAnim = useState(new Animated.Value(0))[0];
 
@@ -82,8 +97,8 @@ export default function MainScreen() {
       return;
     }
 
-    const result = detectAllIssues(text, cleaningOptions);
-    const cleaned = cleanText(text, cleaningOptions);
+    const result = detectAllIssues(text, cleaningOptions, wordExchanges);
+    const cleaned = cleanText(text, cleaningOptions, wordExchanges, varianceSettings);
     
     setDetectionResult(result);
     setCleanedText(cleaned);
@@ -181,8 +196,8 @@ export default function MainScreen() {
       // Re-process text with new options if we have input
       if (inputText) {
         setTimeout(() => {
-          const result = detectAllIssues(inputText, newOptions);
-          const cleaned = cleanText(inputText, newOptions);
+          const result = detectAllIssues(inputText, newOptions, wordExchanges);
+          const cleaned = cleanText(inputText, newOptions, wordExchanges, varianceSettings);
           setDetectionResult(result);
           setCleanedText(cleaned);
         }, 0);
@@ -195,6 +210,70 @@ export default function MainScreen() {
   const toggleOptionsPanel = useCallback(() => {
     setShowOptions(prev => !prev);
   }, []);
+
+  const addWordExchange = useCallback(() => {
+    const newId = Date.now().toString();
+    setWordExchanges(prev => [...prev, { id: newId, badWord: '', goodWord: '', enabled: true }]);
+  }, []);
+
+  const removeWordExchange = useCallback((id: string) => {
+    setWordExchanges(prev => prev.filter(ex => ex.id !== id));
+  }, []);
+
+  const updateWordExchange = useCallback((id: string, field: keyof WordExchange, value: string | boolean) => {
+    setWordExchanges(prev => prev.map(ex => 
+      ex.id === id ? { ...ex, [field]: value } : ex
+    ));
+    
+    // Re-process text if we have input
+    if (inputText) {
+      setTimeout(() => {
+        const updatedExchanges = wordExchanges.map(ex => 
+          ex.id === id ? { ...ex, [field]: value } : ex
+        );
+        const result = detectAllIssues(inputText, cleaningOptions, updatedExchanges);
+        const cleaned = cleanText(inputText, cleaningOptions, updatedExchanges, varianceSettings);
+        setDetectionResult(result);
+        setCleanedText(cleaned);
+      }, 0);
+    }
+  }, [inputText, cleaningOptions, wordExchanges, varianceSettings]);
+
+  const toggleVarianceSetting = useCallback((setting: keyof VarianceSettings) => {
+    setVarianceSettings(prev => {
+      const newSettings = { ...prev, [setting]: !prev[setting] };
+      
+      // Re-process text if we have input
+      if (inputText) {
+        setTimeout(() => {
+          const result = detectAllIssues(inputText, cleaningOptions, wordExchanges);
+          const cleaned = cleanText(inputText, cleaningOptions, wordExchanges, newSettings);
+          setDetectionResult(result);
+          setCleanedText(cleaned);
+        }, 0);
+      }
+      
+      return newSettings;
+    });
+  }, [inputText, cleaningOptions, wordExchanges]);
+
+  const resetWordExchanges = useCallback(() => {
+    setWordExchanges([
+      { id: '1', badWord: '', goodWord: '', enabled: true },
+      { id: '2', badWord: '', goodWord: '', enabled: true },
+      { id: '3', badWord: '', goodWord: '', enabled: true },
+    ]);
+    
+    // Re-process text if we have input
+    if (inputText) {
+      setTimeout(() => {
+        const result = detectAllIssues(inputText, cleaningOptions, []);
+        const cleaned = cleanText(inputText, cleaningOptions, [], varianceSettings);
+        setDetectionResult(result);
+        setCleanedText(cleaned);
+      }, 0);
+    }
+  }, [inputText, cleaningOptions, varianceSettings]);
 
   const stats = useMemo(() => {
     if (!detectionResult) return null;
@@ -400,7 +479,122 @@ export default function MainScreen() {
                     </View>
                     <Text style={styles.optionLabel}>Extra Whitespace</Text>
                   </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('wordExchanges')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.wordExchanges && styles.checkboxActive]}>
+                      {cleaningOptions.wordExchanges && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Word Exchanges</Text>
+                  </TouchableOpacity>
                 </View>
+                
+                {/* Word Exchanges Section */}
+                {cleaningOptions.wordExchanges && (
+                  <View style={styles.wordExchangesSection}>
+                    <View style={styles.wordExchangesHeader}>
+                      <Text style={styles.wordExchangesTitle}>Word Exchanges</Text>
+                      <View style={styles.wordExchangesActions}>
+                        <TouchableOpacity 
+                          onPress={resetWordExchanges}
+                          style={styles.resetButton}
+                        >
+                          <RotateCcw color="#94A3B8" size={16} />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          onPress={addWordExchange}
+                          style={styles.addButton}
+                        >
+                          <Plus color="#60A5FA" size={16} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    
+                    {wordExchanges.map((exchange) => (
+                      <View key={exchange.id} style={styles.wordExchangeItem}>
+                        <View style={styles.wordExchangeRow}>
+                          <TouchableOpacity 
+                            style={styles.exchangeCheckbox}
+                            onPress={() => updateWordExchange(exchange.id, 'enabled', !exchange.enabled)}
+                          >
+                            <View style={[styles.checkbox, exchange.enabled && styles.checkboxActive]}>
+                              {exchange.enabled && <CheckCircle color="#FFFFFF" size={12} />}
+                            </View>
+                          </TouchableOpacity>
+                          
+                          <View style={styles.wordInputs}>
+                            <TextInput
+                              style={styles.wordInput}
+                              placeholder="Bad word"
+                              placeholderTextColor="#64748B"
+                              value={exchange.badWord}
+                              onChangeText={(text) => updateWordExchange(exchange.id, 'badWord', text)}
+                            />
+                            <Text style={styles.arrowText}>→</Text>
+                            <TextInput
+                              style={styles.wordInput}
+                              placeholder="Good word"
+                              placeholderTextColor="#64748B"
+                              value={exchange.goodWord}
+                              onChangeText={(text) => updateWordExchange(exchange.id, 'goodWord', text)}
+                            />
+                          </View>
+                          
+                          {wordExchanges.length > 1 && (
+                            <TouchableOpacity 
+                              onPress={() => removeWordExchange(exchange.id)}
+                              style={styles.removeButton}
+                            >
+                              <Minus color="#EF4444" size={16} />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    ))}
+                    
+                    {/* Variance Settings */}
+                    <View style={styles.varianceSection}>
+                      <Text style={styles.varianceTitle}>Variance Settings</Text>
+                      <View style={styles.varianceOptions}>
+                        <TouchableOpacity 
+                          style={styles.varianceItem}
+                          onPress={() => toggleVarianceSetting('enabled')}
+                        >
+                          <View style={[styles.checkbox, varianceSettings.enabled && styles.checkboxActive]}>
+                            {varianceSettings.enabled && <CheckCircle color="#FFFFFF" size={12} />}
+                          </View>
+                          <Text style={styles.varianceLabel}>Enable Variations</Text>
+                        </TouchableOpacity>
+                        
+                        {varianceSettings.enabled && (
+                          <>
+                            <TouchableOpacity 
+                              style={styles.varianceItem}
+                              onPress={() => toggleVarianceSetting('caseVariation')}
+                            >
+                              <View style={[styles.checkbox, varianceSettings.caseVariation && styles.checkboxActive]}>
+                                {varianceSettings.caseVariation && <CheckCircle color="#FFFFFF" size={12} />}
+                              </View>
+                              <Text style={styles.varianceLabel}>Case Variations</Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity 
+                              style={styles.varianceItem}
+                              onPress={() => toggleVarianceSetting('pluralVariation')}
+                            >
+                              <View style={[styles.checkbox, varianceSettings.pluralVariation && styles.checkboxActive]}>
+                                {varianceSettings.pluralVariation && <CheckCircle color="#FFFFFF" size={12} />}
+                              </View>
+                              <Text style={styles.varianceLabel}>Plural Variations</Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 
@@ -827,5 +1021,114 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#E2E8F0',
     flex: 1,
+  },
+  wordExchangesSection: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(96, 165, 250, 0.2)',
+  },
+  wordExchangesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  wordExchangesTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#E2E8F0',
+  },
+  wordExchangesActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  addButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: 'rgba(96, 165, 250, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resetButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: 'rgba(148, 163, 184, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wordExchangeItem: {
+    marginBottom: 8,
+  },
+  wordExchangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exchangeCheckbox: {
+    padding: 4,
+  },
+  wordInputs: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  wordInput: {
+    flex: 1,
+    backgroundColor: '#0A0E27',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    fontSize: 12,
+    color: '#F1F5F9',
+  },
+  arrowText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '600' as const,
+  },
+  removeButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  varianceSection: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(96, 165, 250, 0.1)',
+  },
+  varianceTitle: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#94A3B8',
+    marginBottom: 8,
+  },
+  varianceOptions: {
+    gap: 6,
+  },
+  varianceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  varianceLabel: {
+    fontSize: 12,
+    color: '#E2E8F0',
   },
 });

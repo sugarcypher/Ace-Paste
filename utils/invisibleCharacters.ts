@@ -1,4 +1,4 @@
-import type { DetectionResult, InvisibleCharacterMap, CleaningOptions } from '@/types/detection';
+import type { DetectionResult, InvisibleCharacterMap, CleaningOptions, WordExchange, VarianceSettings } from '@/types/detection';
 
 // Comprehensive list of invisible Unicode characters used for tracking
 export const INVISIBLE_CHARACTERS: InvisibleCharacterMap = {
@@ -196,7 +196,46 @@ const REPEATING_CHARS_REGEX = /(.)\1{2,}/g;
 const FORMATTING_LINES_REGEX = /^[-=_*]{3,}\s*$/gm;
 const EXTRA_WHITESPACE_REGEX = /\s{2,}/g;
 
-export function detectAllIssues(text: string, options: CleaningOptions): DetectionResult {
+// Helper function to escape regex special characters
+function escapeRegex(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Helper function to generate word variations
+function generateWordVariations(word: string, varianceSettings: VarianceSettings): string[] {
+  const variations = [word];
+  
+  if (!varianceSettings.enabled) {
+    return variations;
+  }
+  
+  // Case variations
+  if (varianceSettings.caseVariation) {
+    variations.push(
+      word.toLowerCase(),
+      word.toUpperCase(),
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    );
+  }
+  
+  // Plural variations (basic)
+  if (varianceSettings.pluralVariation) {
+    if (!word.endsWith('s')) {
+      variations.push(word + 's');
+    }
+    if (word.endsWith('s') && word.length > 1) {
+      variations.push(word.slice(0, -1));
+    }
+    if (word.endsWith('y') && word.length > 1) {
+      variations.push(word.slice(0, -1) + 'ies');
+    }
+  }
+  
+  // Remove duplicates
+  return [...new Set(variations)];
+}
+
+export function detectAllIssues(text: string, options: CleaningOptions, wordExchanges?: WordExchange[]): DetectionResult {
   const invisibleResult = options.invisibleChars ? detectInvisibleCharacters(text) : {
     totalCount: 0,
     categories: {
@@ -213,12 +252,26 @@ export function detectAllIssues(text: string, options: CleaningOptions): Detecti
     positions: [],
   };
 
+  // Count word exchanges
+  let wordExchangeCount = 0;
+  if (options.wordExchanges && wordExchanges) {
+    const enabledExchanges = wordExchanges.filter(ex => ex.enabled && ex.badWord.trim() && ex.goodWord.trim());
+    for (const exchange of enabledExchanges) {
+      const regex = new RegExp(`\\b${escapeRegex(exchange.badWord)}\\b`, 'gi');
+      const matches = text.match(regex);
+      if (matches) {
+        wordExchangeCount += matches.length;
+      }
+    }
+  }
+
   const additionalCleaning = {
     markdownHeaders: options.markdownHeaders ? (text.match(MARKDOWN_HEADER_REGEX) || []).length : 0,
     markdownBold: options.markdownBold ? (text.match(MARKDOWN_BOLD_REGEX) || []).length : 0,
     repeatingChars: options.repeatingChars ? (text.match(REPEATING_CHARS_REGEX) || []).length : 0,
     formattingLines: options.formattingLines ? (text.match(FORMATTING_LINES_REGEX) || []).length : 0,
     extraWhitespace: options.extraWhitespace ? (text.match(EXTRA_WHITESPACE_REGEX) || []).length : 0,
+    wordExchanges: wordExchangeCount,
   };
 
   return {
@@ -227,7 +280,7 @@ export function detectAllIssues(text: string, options: CleaningOptions): Detecti
   };
 }
 
-export function cleanText(text: string, options: CleaningOptions): string {
+export function cleanText(text: string, options: CleaningOptions, wordExchanges?: WordExchange[], varianceSettings?: VarianceSettings): string {
   let result = text;
 
   // Remove invisible characters first
@@ -258,6 +311,27 @@ export function cleanText(text: string, options: CleaningOptions): string {
   // Normalize whitespace
   if (options.extraWhitespace) {
     result = result.replace(EXTRA_WHITESPACE_REGEX, ' ');
+  }
+
+  // Apply word exchanges
+  if (options.wordExchanges && wordExchanges) {
+    const enabledExchanges = wordExchanges.filter(ex => ex.enabled && ex.badWord.trim() && ex.goodWord.trim());
+    
+    for (const exchange of enabledExchanges) {
+      if (varianceSettings?.enabled) {
+        // Generate variations of the bad word
+        const badWordVariations = generateWordVariations(exchange.badWord, varianceSettings);
+        
+        for (const variation of badWordVariations) {
+          const regex = new RegExp(`\\b${escapeRegex(variation)}\\b`, 'gi');
+          result = result.replace(regex, exchange.goodWord);
+        }
+      } else {
+        // Simple exact match replacement
+        const regex = new RegExp(`\\b${escapeRegex(exchange.badWord)}\\b`, 'gi');
+        result = result.replace(regex, exchange.goodWord);
+      }
+    }
   }
 
   // Clean up extra newlines and trim
