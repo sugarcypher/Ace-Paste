@@ -19,6 +19,12 @@ export interface DetectionResult {
     formattingLines: number;
     extraWhitespace: number;
     wordExchanges: number;
+    emDashes: number;
+    underscoreFormatting: number;
+    backtickCode: number;
+    htmlTags: number;
+    bulletPoints: number;
+    numberedLists: number;
   };
 }
 
@@ -54,6 +60,12 @@ export interface CleaningOptions {
   formattingLines: boolean;
   extraWhitespace: boolean;
   wordExchanges: boolean;
+  emDashes: boolean;
+  underscoreFormatting: boolean;
+  backtickCode: boolean;
+  htmlTags: boolean;
+  bulletPoints: boolean;
+  numberedLists: boolean;
 }
 
 export interface ScanResult {

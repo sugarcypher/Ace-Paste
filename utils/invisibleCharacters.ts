@@ -195,6 +195,12 @@ const MARKDOWN_BOLD_REGEX = /\*\*(.*?)\*\*|__(.*?)__/g;
 const REPEATING_CHARS_REGEX = /(.)\1{2,}/g;
 const FORMATTING_LINES_REGEX = /^[-=_*]{3,}\s*$/gm;
 const EXTRA_WHITESPACE_REGEX = /\s{2,}/g;
+const EM_DASH_REGEX = /—+/g;
+const UNDERSCORE_FORMATTING_REGEX = /_{2,}(.*?)_{2,}/g;
+const BACKTICK_CODE_REGEX = /`{1,3}([^`]*)`{1,3}/g;
+const HTML_TAGS_REGEX = /<[^>]*>/g;
+const BULLET_POINTS_REGEX = /^\s*[•·▪▫‣⁃◦‧⁌⁍]*\s*/gm;
+const NUMBERED_LISTS_REGEX = /^\s*\d+[.)\]\}]\s*/gm;
 
 // Helper function to escape regex special characters
 function escapeRegex(string: string): string {
@@ -272,6 +278,12 @@ export function detectAllIssues(text: string, options: CleaningOptions, wordExch
     formattingLines: options.formattingLines ? (text.match(FORMATTING_LINES_REGEX) || []).length : 0,
     extraWhitespace: options.extraWhitespace ? (text.match(EXTRA_WHITESPACE_REGEX) || []).length : 0,
     wordExchanges: wordExchangeCount,
+    emDashes: options.emDashes ? (text.match(EM_DASH_REGEX) || []).length : 0,
+    underscoreFormatting: options.underscoreFormatting ? (text.match(UNDERSCORE_FORMATTING_REGEX) || []).length : 0,
+    backtickCode: options.backtickCode ? (text.match(BACKTICK_CODE_REGEX) || []).length : 0,
+    htmlTags: options.htmlTags ? (text.match(HTML_TAGS_REGEX) || []).length : 0,
+    bulletPoints: options.bulletPoints ? (text.match(BULLET_POINTS_REGEX) || []).length : 0,
+    numberedLists: options.numberedLists ? (text.match(NUMBERED_LISTS_REGEX) || []).length : 0,
   };
 
   return {
@@ -306,6 +318,36 @@ export function cleanText(text: string, options: CleaningOptions, wordExchanges?
   // Remove formatting lines
   if (options.formattingLines) {
     result = result.replace(FORMATTING_LINES_REGEX, '');
+  }
+
+  // Remove em dashes
+  if (options.emDashes) {
+    result = result.replace(EM_DASH_REGEX, '-');
+  }
+
+  // Remove underscore formatting
+  if (options.underscoreFormatting) {
+    result = result.replace(UNDERSCORE_FORMATTING_REGEX, '$1');
+  }
+
+  // Remove backtick code formatting
+  if (options.backtickCode) {
+    result = result.replace(BACKTICK_CODE_REGEX, '$1');
+  }
+
+  // Remove HTML tags
+  if (options.htmlTags) {
+    result = result.replace(HTML_TAGS_REGEX, '');
+  }
+
+  // Remove bullet points
+  if (options.bulletPoints) {
+    result = result.replace(BULLET_POINTS_REGEX, '');
+  }
+
+  // Remove numbered lists
+  if (options.numberedLists) {
+    result = result.replace(NUMBERED_LISTS_REGEX, '');
   }
 
   // Normalize whitespace

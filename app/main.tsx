@@ -59,6 +59,12 @@ export default function MainScreen() {
     formattingLines: false,
     extraWhitespace: false,
     wordExchanges: false,
+    emDashes: false,
+    underscoreFormatting: false,
+    backtickCode: false,
+    htmlTags: false,
+    bulletPoints: false,
+    numberedLists: false,
   });
   const [wordExchanges, setWordExchanges] = useState<WordExchange[]>([
     { id: '1', badWord: '', goodWord: '', enabled: true },
@@ -478,6 +484,66 @@ export default function MainScreen() {
                       {cleaningOptions.extraWhitespace && <CheckCircle color="#FFFFFF" size={16} />}
                     </View>
                     <Text style={styles.optionLabel}>Extra Whitespace</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('emDashes')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.emDashes && styles.checkboxActive]}>
+                      {cleaningOptions.emDashes && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Em Dashes (—)</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('underscoreFormatting')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.underscoreFormatting && styles.checkboxActive]}>
+                      {cleaningOptions.underscoreFormatting && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Underscore Formatting (__)</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('backtickCode')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.backtickCode && styles.checkboxActive]}>
+                      {cleaningOptions.backtickCode && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Code Blocks (`)</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('htmlTags')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.htmlTags && styles.checkboxActive]}>
+                      {cleaningOptions.htmlTags && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>HTML Tags</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('bulletPoints')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.bulletPoints && styles.checkboxActive]}>
+                      {cleaningOptions.bulletPoints && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Bullet Points (•)</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => toggleOption('numberedLists')}
+                  >
+                    <View style={[styles.checkbox, cleaningOptions.numberedLists && styles.checkboxActive]}>
+                      {cleaningOptions.numberedLists && <CheckCircle color="#FFFFFF" size={16} />}
+                    </View>
+                    <Text style={styles.optionLabel}>Numbered Lists (1.)</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity 
